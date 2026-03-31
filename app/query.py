@@ -11,9 +11,12 @@ B = 0.75
 def tokenize(text: str):
     return TOKEN_RE.findall(text.lower())
 
-query = " ".join(sys.argv[1:]).strip()
-terms = tokenize(query)
+if len(sys.argv) > 1:
+    query = " ".join(sys.argv[1:]).strip()
+else:
+    query = sys.stdin.read().strip()
 
+terms = tokenize(query)
 if not terms:
     print("Empty query")
     sys.exit(0)
@@ -36,12 +39,10 @@ N = float(doc_count_row.value)
 avgdl = float(total_dl_row.value) / N if N > 0 else 0.0
 
 records = []
-
 for term in terms:
     vocab_row = session.execute(
         "SELECT df FROM vocabulary WHERE term=%s", [term]
     ).one()
-
     if not vocab_row:
         continue
 
@@ -51,7 +52,6 @@ for term in terms:
     postings = session.execute(
         "SELECT doc_id, title, tf, dl FROM postings WHERE term=%s", [term]
     )
-
     for row in postings:
         records.append((row.doc_id, row.title, float(row.tf), float(row.dl), idf))
 
@@ -85,3 +85,4 @@ for score, doc_id, title in top10:
     print(f"{doc_id}\t{title}")
 
 spark.stop()
+cluster.shutdown()

@@ -1,3 +1,7 @@
+cat > /usr/local/hadoop/etc/hadoop/workers <<'EOF'
+cluster-slave-1
+EOF
+
 #!/bin/bash
 # This will run only by the master node
 
@@ -13,7 +17,7 @@ mapred --daemon start historyserver
 
 
 # track process IDs of services
-jps -lm
+jps -l -m
 
 # subtool to perform administrator functions on HDFS
 # outputs a brief report on the overall HDFS filesystem
@@ -36,7 +40,7 @@ hdfs dfs -chmod +rx /apps/spark/jars/
 scala -version
 
 # track process IDs of services
-jps -lm
+jps -l -m
 
 # Create a directory for root user on HDFS
 hdfs dfs -mkdir -p /user/root
