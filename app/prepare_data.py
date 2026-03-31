@@ -1,27 +1,39 @@
+from pathlib import Path
 from pathvalidate import sanitize_filename
-from tqdm import tqdm
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, length, trim
 
-
-spark = SparkSession.builder \
-    .appName('data preparation') \
-    .master("local") \
-    .config("spark.sql.parquet.enableVectorizedReader", "true") \
+spark = (
+    SparkSession.builder
+    .appName("data preparation")
+    .master("local[*]")
+    .config("spark.sql.parquet.enableVectorizedReader", "true")
     .getOrCreate()
+)
 
+INPUT_PARQUET = "/app/a.parquet"
+OUTPUT_DIR = Path("/app/data")
+N = 1000
 
-df = spark.read.parquet("/a.parquet")
-n = 1000
-df = df.select(['id', 'title', 'text']).sample(fraction=100 * n / df.count(), seed=0).limit(n)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+df = (
+    spark.read.parquet(INPUT_PARQUET)
+    .select("id", "title", "text")
+    .filter(col("text").isNotNull())
+    .filter(length(trim(col("text"))) > 0)
+    .limit(N)
+)
 
-def create_doc(row):
-    filename = "data/" + sanitize_filename(str(row['id']) + "_" + row['title']).replace(" ", "_") + ".txt"
-    with open(filename, "w") as f:
-        f.write(row['text'])
+def normalize_title(title: str) -> str:
+    title = title or "untitled"
+    return sanitize_filename(title).replace(" ", "_")
 
+for row in df.toLocalIterator():
+    doc_id = str(row["id"])
+    title = normalize_title(row["title"])
+    text = row["text"].strip()
+    path = OUTPUT_DIR / f"{doc_id}_{title}.txt"
+    path.write_text(text, encoding="utf-8")
 
-df.foreach(create_doc)
-
-
-# df.write.csv("/index/data", sep = "\t")
+spark.stop()
